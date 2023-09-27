@@ -1,0 +1,47 @@
+SELECT 
+TO_CHAR(date_trunc('month', x.as_of)::date, 'Mon-YYYY') AS as_of,
+x.emp_id,
+x.region_name,
+sum(x.rp_visit) rp_visit,
+sum(x.pl_visit) pl_visit
+FROM
+(SELECT
+fvp.visit_date AS as_of,
+fv.emp_id,
+fv.emp_name,
+ch.zone_name,
+ch.cluster_name,
+ch.region_name,
+ch.unit_name,
+ch.branch_name,
+SUM(CASE WHEN spm.process_id = 100435 THEN 1 ELSE 0 END) rp_visit,
+SUM(CASE WHEN spm.process_id = 100436 THEN 1 ELSE 0 END) pl_visit
+FROM field_visit_processes fvp
+JOIN field_visit fv ON fv.field_visit_id = fvp.field_visit_id
+JOIN center_hierarchy_custom_2 ch ON ch.branch_id = fvp.branch_id
+JOIN sub_process_master spm ON spm.sub_process_id = fvp.sub_process_id  and spm.sub_process_id != 140
+WHERE spm.process_id IN (100435,100436) AND fv.acc_id = 'C161' AND fv.emp_id = 'C4404' AND fvp.is_deleted = False
+AND fvp.visit_date BETWEEN DATE(TO_CHAR(DATE('2023-09-13') - INTERVAL '2 Months', 'YYYY-MM-01')) AND DATE('2023-09-13')
+GROUP BY 1,2,3,4,5,6,7,8
+
+UNION ALL
+
+SELECT a.*,b.* FROM (
+SELECT DISTINCT date(to_char(fvp.visit_date,'YYYY-MM-01')) AS as_of,fv.emp_id,
+fv.emp_name
+FROM field_visit_processes fvp
+JOIN field_visit fv ON fv.field_visit_id = fvp.field_visit_id
+JOIN sub_process_master spm ON spm.sub_process_id = fvp.sub_process_id  and spm.sub_process_id != 140
+WHERE spm.process_id IN (100435,100436) AND fv.acc_id = 'C161' AND fv.emp_id = 'C4404' AND fvp.is_deleted = False
+AND fvp.visit_date BETWEEN DATE(TO_CHAR(DATE('2023-09-13') - INTERVAL '2 Months', 'YYYY-MM-01')) AND DATE('2023-09-13')) a,(SELECT
+ch.zone_name,
+ch.cluster_name,
+ch.region_name,
+ch.unit_name,
+ch.branch_name,
+0 AS rp_visit,
+0 AS pl_visit
+FROM center_hierarchy_custom_2 ch
+WHERE ch.cluster_id = 'C161') b) x
+GROUP BY date_trunc('month', x.as_of),2,3
+order by date_trunc('month', x.as_of) DESC;
